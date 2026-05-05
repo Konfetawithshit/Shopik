@@ -2,18 +2,6 @@ import asyncio
 import json
 import os
 from datetime import datetime
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import (
-    InlineKeyboardMarkup, 
-    InlineKeyboardButton, 
-    WebAppInfo,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
-from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 # ========== КОНФИГУРАЦИЯ ==========
@@ -21,164 +9,188 @@ TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_IDS = [int(id.strip()) for id in os.getenv("ADMIN_IDS", "0").split(",") if id.strip()]
 PORT = int(os.getenv("PORT", "8080"))
 RENDER_URL = os.getenv("RENDER_URL", "")
+TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
-
-# ========== БАЗА ДАННЫХ ==========
+# ========== ХРАНИЛИЩЕ ==========
 DATA_FILE = "store_data.json"
 
 def load_data():
-    if os.path.exists(DATA_FILE):
+    try:
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    data = {
-        "payment_details": {
-            "bank": {
-                "bank_name": "SBERBANK",
-                "recipient": "ИП Иванов И.И.",
-                "inn": "770000000000",
-                "account": "40802810000000000000",
-                "bik": "044525225"
+    except:
+        data = {
+            "payment_details": {
+                "bank": {
+                    "bank_name": "SBERBANK",
+                    "recipient": "ИП Иванов И.И.",
+                    "inn": "770000000000",
+                    "account": "40802810000000000000",
+                    "bik": "044525225"
+                },
+                "crypto": {
+                    "TON": "UQD...",
+                    "USDT": "TJ..."
+                }
             },
-            "crypto": {
-                "TON": "UQD...ваш_адрес_ton",
-                "USDT": "TJ...ваш_адрес_usdt"
-            }
-        },
-        "orders": []
-    }
-    save_data(data)
-    return data
+            "orders": [],
+            "admin_state": {}
+        }
+        save_data(data)
+        return data
 
 def save_data(data):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ========== СОСТОЯНИЯ ==========
-class AdminStates(StatesGroup):
-    waiting_bank_name = State()
-    waiting_recipient = State()
-    waiting_inn = State()
-    waiting_account = State()
-    waiting_bik = State()
-    waiting_ton = State()
-    waiting_usdt = State()
+# ========== TELEGRAM ОТПРАВКА ==========
+async def send_message(chat_id, text, reply_markup=None):
+    import aiohttp
+    url = f"{TG_API}/sendMessage"
+    data = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    if reply_markup:
+        data["reply_markup"] = json.dumps(reply_markup)
+    
+    async with aiohttp.ClientSession() as session:
+        await session.post(url, json=data)
 
 # ========== КЛАВИАТУРЫ ==========
-def main_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🛍 ОТКРЫТЬ МАГАЗИН", web_app=WebAppInfo(url=f"{RENDER_URL}/ssss.html"))]],
-        resize_keyboard=True
-    )
-
-def admin_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 Изменить банк", callback_data="admin_bank")],
-        [InlineKeyboardButton(text="💎 Изменить крипту", callback_data="admin_crypto")],
-        [InlineKeyboardButton(text="📋 Заказы", callback_data="admin_orders")],
-        [InlineKeyboardButton(text="🛍 Магазин", web_app=WebAppInfo(url=f"{RENDER_URL}/ssss.html"))]
-    ])
-
-# ========== КОМАНДЫ ==========
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    if message.from_user.id in ADMIN_IDS:
-        await message.answer("🎨 NEON MARKETPLACE - АДМИНКА", reply_markup=admin_keyboard())
-    else:
-        await message.answer("🔥 NEON MARKETPLACE\n\nДобро пожаловать!", reply_markup=main_keyboard())
-
-# ========== АДМИНКА: БАНК ==========
-@dp.callback_query(F.data == "admin_bank")
-async def admin_bank(callback: types.CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await callback.message.answer("Введите название банка:")
-    await state.set_state(AdminStates.waiting_bank_name)
-
-@dp.message(AdminStates.waiting_bank_name)
-async def step1(message: types.Message, state: FSMContext):
-    await state.update_data(bank_name=message.text)
-    await message.answer("Введите получателя:")
-    await state.set_state(AdminStates.waiting_recipient)
-
-@dp.message(AdminStates.waiting_recipient)
-async def step2(message: types.Message, state: FSMContext):
-    await state.update_data(recipient=message.text)
-    await message.answer("Введите ИНН:")
-    await state.set_state(AdminStates.waiting_inn)
-
-@dp.message(AdminStates.waiting_inn)
-async def step3(message: types.Message, state: FSMContext):
-    await state.update_data(inn=message.text)
-    await message.answer("Введите счёт:")
-    await state.set_state(AdminStates.waiting_account)
-
-@dp.message(AdminStates.waiting_account)
-async def step4(message: types.Message, state: FSMContext):
-    await state.update_data(account=message.text)
-    await message.answer("Введите БИК:")
-    await state.set_state(AdminStates.waiting_bik)
-
-@dp.message(AdminStates.waiting_bik)
-async def step5(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    store = load_data()
-    store["payment_details"]["bank"] = {
-        "bank_name": data["bank_name"],
-        "recipient": data["recipient"],
-        "inn": data["inn"],
-        "account": data["account"],
-        "bik": message.text
+def admin_menu():
+    return {
+        "inline_keyboard": [
+            [{"text": "🏦 Банк", "callback_data": "bank"}, {"text": "💎 Крипта", "callback_data": "crypto"}],
+            [{"text": "📋 Заказы", "callback_data": "orders"}],
+            [{"text": "🛍 Открыть магазин", "web_app": {"url": f"{RENDER_URL}/ssss.html"}}]
+        ]
     }
-    save_data(store)
-    await message.answer("✅ Банковские реквизиты обновлены!")
-    await state.clear()
 
-# ========== АДМИНКА: КРИПТА ==========
-@dp.callback_query(F.data == "admin_crypto")
-async def admin_crypto(callback: types.CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await callback.message.answer("Введите TON адрес:")
-    await state.set_state(AdminStates.waiting_ton)
-
-@dp.message(AdminStates.waiting_ton)
-async def crypt1(message: types.Message, state: FSMContext):
-    await state.update_data(ton=message.text)
-    await message.answer("Введите USDT (TRC-20):")
-    await state.set_state(AdminStates.waiting_usdt)
-
-@dp.message(AdminStates.waiting_usdt)
-async def crypt2(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    store = load_data()
-    store["payment_details"]["crypto"] = {
-        "TON": data["ton"],
-        "USDT": message.text
+def main_menu():
+    return {
+        "keyboard": [[{"text": "🛍 ОТКРЫТЬ МАГАЗИН", "web_app": {"url": f"{RENDER_URL}/ssss.html"}}]],
+        "resize_keyboard": True
     }
-    save_data(store)
-    await message.answer("✅ Крипто-реквизиты обновлены!")
-    await state.clear()
 
-# ========== ЗАКАЗЫ ==========
-@dp.callback_query(F.data == "admin_orders")
-async def admin_orders(callback: types.CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    store = load_data()
-    if not store["orders"]:
-        await callback.message.answer("📋 Заказов пока нет")
-        return
-    text = "📋 ПОСЛЕДНИЕ ЗАКАЗЫ:\n\n"
-    for o in store["orders"][-10:]:
-        text += f"#{o['id']} | {o['date']}\n"
-        text += f"{o['product']} | {o['size']} | {o['price']}₽\n"
-        text += f"{o['shop']}\n\n"
-    await callback.message.answer(text)
+# ========== WEBHOOK ОБРАБОТЧИК ==========
+async def webhook(request):
+    try:
+        update = await request.json()
+        
+        if "message" in update:
+            msg = update["message"]
+            chat_id = msg["chat"]["id"]
+            text = msg.get("text", "")
+            
+            # /start
+            if text == "/start":
+                if chat_id in ADMIN_IDS:
+                    await send_message(chat_id, "🎨 <b>NEON MARKETPLACE</b>\nАдмин-панель:", admin_menu())
+                else:
+                    await send_message(chat_id, "🔥 <b>NEON MARKETPLACE</b>\nДобро пожаловать!", main_menu())
+            
+            # Обработка состояний админки
+            else:
+                store = load_data()
+                state = store["admin_state"].get(str(chat_id))
+                
+                if state:
+                    if state == "waiting_bank_name":
+                        store["admin_state"][str(chat_id)] = {"state": "waiting_recipient", "bank_name": text}
+                        save_data(store)
+                        await send_message(chat_id, "Введите получателя:")
+                    
+                    elif state["state"] == "waiting_recipient":
+                        store["admin_state"][str(chat_id)] = {
+                            "state": "waiting_inn",
+                            "bank_name": state["bank_name"],
+                            "recipient": text
+                        }
+                        save_data(store)
+                        await send_message(chat_id, "Введите ИНН:")
+                    
+                    elif state["state"] == "waiting_inn":
+                        store["admin_state"][str(chat_id)] = {
+                            "state": "waiting_account",
+                            "bank_name": state["bank_name"],
+                            "recipient": state["recipient"],
+                            "inn": text
+                        }
+                        save_data(store)
+                        await send_message(chat_id, "Введите счёт:")
+                    
+                    elif state["state"] == "waiting_account":
+                        store["admin_state"][str(chat_id)] = {
+                            "state": "waiting_bik",
+                            "bank_name": state["bank_name"],
+                            "recipient": state["recipient"],
+                            "inn": state["inn"],
+                            "account": text
+                        }
+                        save_data(store)
+                        await send_message(chat_id, "Введите БИК:")
+                    
+                    elif state["state"] == "waiting_bik":
+                        store["payment_details"]["bank"] = {
+                            "bank_name": state["bank_name"],
+                            "recipient": state["recipient"],
+                            "inn": state["inn"],
+                            "account": state["account"],
+                            "bik": text
+                        }
+                        del store["admin_state"][str(chat_id)]
+                        save_data(store)
+                        await send_message(chat_id, "✅ Банковские реквизиты обновлены!")
+                    
+                    elif state == "waiting_ton":
+                        store["admin_state"][str(chat_id)] = {"state": "waiting_usdt", "ton": text}
+                        save_data(store)
+                        await send_message(chat_id, "Введите USDT адрес:")
+                    
+                    elif state["state"] == "waiting_usdt":
+                        store["payment_details"]["crypto"] = {
+                            "TON": state["ton"],
+                            "USDT": text
+                        }
+                        del store["admin_state"][str(chat_id)]
+                        save_data(store)
+                        await send_message(chat_id, "✅ Крипто-реквизиты обновлены!")
+        
+        # Callback от кнопок
+        elif "callback_query" in update:
+            cb = update["callback_query"]
+            chat_id = cb["message"]["chat"]["id"]
+            data = cb["data"]
+            
+            if chat_id in ADMIN_IDS:
+                if data == "bank":
+                    store = load_data()
+                    store["admin_state"][str(chat_id)] = "waiting_bank_name"
+                    save_data(store)
+                    await send_message(chat_id, "Введите название банка:")
+                
+                elif data == "crypto":
+                    store = load_data()
+                    store["admin_state"][str(chat_id)] = "waiting_ton"
+                    save_data(store)
+                    await send_message(chat_id, "Введите TON адрес:")
+                
+                elif data == "orders":
+                    store = load_data()
+                    if not store["orders"]:
+                        await send_message(chat_id, "📋 Заказов пока нет")
+                    else:
+                        text = "<b>📋 ПОСЛЕДНИЕ ЗАКАЗЫ:</b>\n\n"
+                        for o in store["orders"][-10:]:
+                            text += f"#{o['id']} | {o['date']}\n{o['product']} | {o['price']}₽\n{o['shop']}\n\n"
+                        await send_message(chat_id, text)
+        
+        return web.Response(text="ok")
+    except Exception as e:
+        print(f"Error: {e}")
+        return web.Response(text="ok")
 
 # ========== API ==========
 async def api_payment(request):
@@ -191,46 +203,51 @@ async def api_order(request):
         order = {
             "id": len(store["orders"]) + 1,
             "user": data.get("user", "anon"),
-            "user_id": data.get("user_id"),
             "product": data.get("product"),
             "size": data.get("size"),
             "price": data.get("price"),
             "shop": data.get("shop"),
             "country": data.get("country"),
             "city": data.get("city"),
-            "payment_method": data.get("payment_method"),
             "date": datetime.now().strftime("%d.%m.%Y %H:%M")
         }
         store["orders"].append(order)
         save_data(store)
         
+        # Уведомление админам
         for aid in ADMIN_IDS:
-            try:
-                await bot.send_message(aid, f"🛍 Заказ #{order['id']}\n{order['product']} | {order['price']}₽\n{order['shop']}")
-            except:
-                pass
+            await send_message(aid, f"🛍 <b>Новый заказ #{order['id']}</b>\n{order['product']} | {order['price']}₽\n{order['shop']}")
         
-        return web.json_response({"status": "ok", "order_id": order["id"]})
-    except Exception as e:
+        return web.json_response({"status": "ok"})
+    except:
         return web.json_response({"status": "error"}, status=400)
 
 async def index(request):
     return web.FileResponse("ssss.html")
 
+# ========== УСТАНОВКА WEBHOOK ==========
+async def set_webhook():
+    import aiohttp
+    url = f"{TG_API}/setWebhook?url={RENDER_URL}/webhook"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            print(await resp.text())
+
 # ========== ЗАПУСК ==========
 app = web.Application()
+app.router.add_post("/webhook", webhook)
 app.router.add_get("/api/payment-details", api_payment)
 app.router.add_post("/api/order", api_order)
 app.router.add_get("/ssss.html", index)
 app.router.add_get("/", index)
 
 async def main():
+    await set_webhook()
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    print(f"🤖 Бот запущен на порту {PORT}")
-    await dp.start_polling(bot)
+    print(f"✅ Бот на порту {PORT}")
 
 if __name__ == "__main__":
     asyncio.run(main())
