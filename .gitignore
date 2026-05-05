@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+
+# Виртуальное окружение
+venv/
+env/
+env.bak/
+venv.bak/
+
+# База данных и временные файлы
+store_data.json
+*.db
+*.sqlite
+*.sqlite3
+
+# Системные файлы
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Логи
+*.log
+
+# Environment (если есть .env файл)
+.env
+.env.local
+.env.production
+
+# Render
+render.yaml
