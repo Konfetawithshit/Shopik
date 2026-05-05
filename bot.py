@@ -17,10 +17,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 # ========== КОНФИГУРАЦИЯ ==========
-TOKEN = os.getenv("BOT_TOKEN", "ВАШ_ТОКЕН_БОТА")
-ADMIN_IDS = [int(id) for id in os.getenv("ADMIN_IDS", "123456789").split(",")]
-PORT = int(os.getenv("PORT", 8080))
-RENDER_URL = os.getenv("RENDER_URL", "https://your-app.onrender.com")
+TOKEN = os.getenv("BOT_TOKEN", "")
+ADMIN_IDS = [int(id.strip()) for id in os.getenv("ADMIN_IDS", "0").split(",") if id.strip()]
+PORT = int(os.getenv("PORT", "8080"))
+RENDER_URL = os.getenv("RENDER_URL", "")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -32,7 +32,7 @@ def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    return {
+    data = {
         "payment_details": {
             "bank": {
                 "bank_name": "SBERBANK",
@@ -48,6 +48,8 @@ def load_data():
         },
         "orders": []
     }
+    save_data(data)
+    return data
 
 def save_data(data):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
@@ -82,91 +84,107 @@ def admin_keyboard():
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
-        await message.answer("🎨 *NEON MARKETPLACE - АДМИНКА*", parse_mode="Markdown", reply_markup=admin_keyboard())
+        await message.answer("🎨 NEON MARKETPLACE - АДМИНКА", reply_markup=admin_keyboard())
     else:
-        await message.answer("🔥 *NEON MARKETPLACE*\n\nДобро пожаловать!", parse_mode="Markdown", reply_markup=main_keyboard())
+        await message.answer("🔥 NEON MARKETPLACE\n\nДобро пожаловать!", reply_markup=main_keyboard())
 
-# ========== АДМИНКА ==========
+# ========== АДМИНКА: БАНК ==========
 @dp.callback_query(F.data == "admin_bank")
 async def admin_bank(callback: types.CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS: return
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
     await callback.message.answer("Введите название банка:")
     await state.set_state(AdminStates.waiting_bank_name)
 
 @dp.message(AdminStates.waiting_bank_name)
-async def p1(message: types.Message, state: FSMContext):
+async def step1(message: types.Message, state: FSMContext):
     await state.update_data(bank_name=message.text)
-    await message.answer("Получатель:")
+    await message.answer("Введите получателя:")
     await state.set_state(AdminStates.waiting_recipient)
 
 @dp.message(AdminStates.waiting_recipient)
-async def p2(message: types.Message, state: FSMContext):
+async def step2(message: types.Message, state: FSMContext):
     await state.update_data(recipient=message.text)
-    await message.answer("ИНН:")
+    await message.answer("Введите ИНН:")
     await state.set_state(AdminStates.waiting_inn)
 
 @dp.message(AdminStates.waiting_inn)
-async def p3(message: types.Message, state: FSMContext):
+async def step3(message: types.Message, state: FSMContext):
     await state.update_data(inn=message.text)
-    await message.answer("Счёт:")
+    await message.answer("Введите счёт:")
     await state.set_state(AdminStates.waiting_account)
 
 @dp.message(AdminStates.waiting_account)
-async def p4(message: types.Message, state: FSMContext):
+async def step4(message: types.Message, state: FSMContext):
     await state.update_data(account=message.text)
-    await message.answer("БИК:")
+    await message.answer("Введите БИК:")
     await state.set_state(AdminStates.waiting_bik)
 
 @dp.message(AdminStates.waiting_bik)
-async def p5(message: types.Message, state: FSMContext):
+async def step5(message: types.Message, state: FSMContext):
     data = await state.get_data()
     store = load_data()
     store["payment_details"]["bank"] = {
-        "bank_name": data["bank_name"], "recipient": data["recipient"],
-        "inn": data["inn"], "account": data["account"], "bik": message.text
+        "bank_name": data["bank_name"],
+        "recipient": data["recipient"],
+        "inn": data["inn"],
+        "account": data["account"],
+        "bik": message.text
     }
     save_data(store)
-    await message.answer("✅ Банк обновлён!")
+    await message.answer("✅ Банковские реквизиты обновлены!")
     await state.clear()
 
+# ========== АДМИНКА: КРИПТА ==========
 @dp.callback_query(F.data == "admin_crypto")
 async def admin_crypto(callback: types.CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS: return
-    await callback.message.answer("TON адрес:")
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    await callback.message.answer("Введите TON адрес:")
     await state.set_state(AdminStates.waiting_ton)
 
 @dp.message(AdminStates.waiting_ton)
-async def c1(message: types.Message, state: FSMContext):
+async def crypt1(message: types.Message, state: FSMContext):
     await state.update_data(ton=message.text)
-    await message.answer("USDT (TRC-20):")
+    await message.answer("Введите USDT (TRC-20):")
     await state.set_state(AdminStates.waiting_usdt)
 
 @dp.message(AdminStates.waiting_usdt)
-async def c2(message: types.Message, state: FSMContext):
+async def crypt2(message: types.Message, state: FSMContext):
     data = await state.get_data()
     store = load_data()
-    store["payment_details"]["crypto"] = {"TON": data["ton"], "USDT": message.text}
+    store["payment_details"]["crypto"] = {
+        "TON": data["ton"],
+        "USDT": message.text
+    }
     save_data(store)
-    await message.answer("✅ Крипта обновлена!")
+    await message.answer("✅ Крипто-реквизиты обновлены!")
     await state.clear()
 
+# ========== ЗАКАЗЫ ==========
 @dp.callback_query(F.data == "admin_orders")
 async def admin_orders(callback: types.CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS: return
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
     store = load_data()
     if not store["orders"]:
-        await callback.message.answer("Нет заказов")
+        await callback.message.answer("📋 Заказов пока нет")
         return
-    text = "📋 *ЗАКАЗЫ:*\n\n"
+    text = "📋 ПОСЛЕДНИЕ ЗАКАЗЫ:\n\n"
     for o in store["orders"][-10:]:
-        text += f"#{o['id']} | {o['date']}\n{o['product']} | {o['size']} | {o['price']}₽\n{o['shop']}\n\n"
-    await callback.message.answer(text, parse_mode="Markdown")
+        text += f"#{o['id']} | {o['date']}\n"
+        text += f"{o['product']} | {o['size']} | {o['price']}₽\n"
+        text += f"{o['shop']}\n\n"
+    await callback.message.answer(text)
 
 # ========== API ==========
-async def handle_payment(request):
+async def api_payment(request):
     return web.json_response(load_data()["payment_details"])
 
-async def handle_order(request):
+async def api_order(request):
     try:
         data = await request.json()
         store = load_data()
@@ -188,29 +206,30 @@ async def handle_order(request):
         
         for aid in ADMIN_IDS:
             try:
-                await bot.send_message(aid, f"🛍 Заказ #{order['id']}\n{order['product']} | {order['price']}₽")
-            except: pass
+                await bot.send_message(aid, f"🛍 Заказ #{order['id']}\n{order['product']} | {order['price']}₽\n{order['shop']}")
+            except:
+                pass
         
         return web.json_response({"status": "ok", "order_id": order["id"]})
     except Exception as e:
-        return web.json_response({"status": "error", "message": str(e)}, status=400)
+        return web.json_response({"status": "error"}, status=400)
 
-async def handle_html(request):
+async def index(request):
     return web.FileResponse("ssss.html")
 
 # ========== ЗАПУСК ==========
 app = web.Application()
-app.router.add_get("/api/payment-details", handle_payment)
-app.router.add_post("/api/order", handle_order)
-app.router.add_get("/ssss.html", handle_html)
-app.router.add_get("/", handle_html)
+app.router.add_get("/api/payment-details", api_payment)
+app.router.add_post("/api/order", api_order)
+app.router.add_get("/ssss.html", index)
+app.router.add_get("/", index)
 
 async def main():
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    print(f"🤖 Бот на порту {PORT}")
+    print(f"🤖 Бот запущен на порту {PORT}")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
