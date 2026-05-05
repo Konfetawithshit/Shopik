@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NEON STREET WEAR | Cyberpunk Store</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0010;
+            color: #b44dff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 30% 20%, rgba(180, 77, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 70% 60%, rgba(200, 0, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(100, 0, 200, 0.1) 0%, transparent 50%);
+        }
+
+        .graffiti-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            background-image: 
+                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><path d="M20,180 Q40,160 60,180 T100,160" stroke="rgba(180,77,255,0.05)" fill="none" stroke-width="2"/><text x="10" y="50" font-size="30" fill="rgba(200,0,255,0.04)" transform="rotate(-20)">STREET</text></svg>');
+            opacity: 0.5;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.05) 2px,
+                rgba(0, 0, 0, 0.05) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .page {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: none;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .page.active {
+            display: flex;
+            animation: glitchIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes glitchIn {
+            0% {
+                opacity: 0;
+                transform: translateX(-10px);
+                filter: hue-rotate(90deg);
+            }
+            20% {
+                transform: translateX(10px);
+                filter: hue-rotate(-90deg);
+            }
+            40% {
+                transform: translateX(-5px);
+                filter: hue-rotate(45deg);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+                filter: hue-rotate(0);
+            }
+        }
+
+        .neon-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: #b44dff;
+            text-shadow: 
+                0 0 10px #b44dff,
+                0 0 20px #b44dff,
+                0 0 40px #b44dff,
+                0 0 80px #b44dff,
+                0 0 120px #c800ff;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            filter: drop-shadow(0 0 10px rgba(180, 77, 255, 0.6));
+        }
+
+        .neon-pink {
+            color: #ff6b9d;
+            text-shadow: 
+                0 0 10px #ff6b9d,
+                0 0 20px #ff6b9d,
+                0 0 40px #ff6b9d;
+        }
+
+        .neon-blue {
+            color: #7b6bff;
+            text-shadow: 
+                0 0 10px #7b6bff,
+                0 0 20px #7b6bff,
+                0 0 40px #7b6bff;
+        }
+
+        .cyber-card {
+            background: linear-gradient(135deg, rgba(20, 0, 40, 0.95), rgba(40, 0, 80, 0.9));
+            border: 1px solid #b44dff;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 
+                0 0 15px rgba(180, 77, 255, 0.3),
+                inset 0 0 15px rgba(180, 77, 255, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+
+        .cyber-card:hover {
+            box-shadow: 
+                0 0 25px rgba(180, 77, 255, 0.5),
+                0 0 50px rgba(200, 0, 255, 0.3),
+                inset 0 0 25px rgba(180, 77, 255, 0.2);
+            transform: translateY(-3px);
+        }
+
+        .cyber-card::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            right: -1px;
+            bottom: -1px;
+            background: linear-gradient(45deg, 
+                #b44dff, transparent, #c800ff, transparent, #b44dff);
+            border-radius: 8px;
+            z-index: -1;
+            animation: borderGlow 3s linear infinite;
+        }
+
+        @keyframes borderGlow {
+            0% { opacity: 0.3; filter: hue-rotate(0deg); }
+            25% { filter: hue-rotate(90deg); }
+            50% { opacity: 0.7; filter: hue-rotate(180deg); }
+            75% { filter: hue-rotate(270deg); }
+            100% { opacity: 0.3; filter: hue-rotate(360deg); }
+        }
+
+        .cyber-btn {
+            background: linear-gradient(45deg, #1a0030, #2a0050);
+            border: 2px solid #b44dff;
+            color: #b44dff;
+            padding: 15px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 0 10px rgba(180, 77, 255, 0.3),
+                inset 0 0 10px rgba(180, 77, 255, 0.1);
+            width: 100%;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .cyber-btn:hover {
+            background: linear-gradient(45deg, #b44dff, #c800ff);
+            color: #0a0010;
+            box-shadow: 
+                0 0 30px rgba(180, 77, 255, 0.8),
+                0 0 60px rgba(200, 0, 255, 0.4);
+            transform: scale(1.02);
+        }
+
+        .cyber-btn:active {
+            transform: scale(0.98);
+        }
+
+        .pink-btn {
+            border-color: #ff6b9d;
+            color: #ff6b9d;
+            box-shadow: 
+                0 0 10px rgba(255, 107, 157, 0.3),
+                inset 0 0 10px rgba(255, 107, 157, 0.1);
+        }
+
+        .pink-btn:hover {
+            background: linear-gradient(45deg, #ff6b9d, #c800ff);
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .product-card {
+            background: rgba(20, 0, 40, 0.8);
+            border: 2px solid rgba(180, 77, 255, 0.4);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .product-card:hover {
+            border-color: #b44dff;
+            box-shadow: 0 0 25px rgba(180, 77, 255, 0.5);
+            transform: translateY(-5px);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #1a0030, #2a0050);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .product-card:hover .product-image img {
+            transform: scale(1.1);
+        }
+
+        .product-image::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(200, 0, 255, 0.3) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(180, 77, 255, 0.2) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        .product-info {
+            padding: 12px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .product-name {
+            color: #b44dff;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(180, 77, 255, 0.5);
+            letter-spacing: 1px;
+        }
+
+        .sizes-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .size-card {
+            background: rgba(20, 0, 40, 0.8);
+            border: 2px solid #7b6bff;
+            color: #7b6bff;
+            padding: 15px 10px;
+            text-align: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .size-card .size-label {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .size-card .size-price {
+            font-size: 14px;
+            color: #ff6b9d;
+            text-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
+            font-weight: bold;
+        }
+
+        .size-card.selected {
+            background: linear-gradient(135deg, #7b6bff, #b44dff);
+            color: #0a0010;
+            box-shadow: 0 0 20px rgba(180, 77, 255, 0.6);
+            border-color: #b44dff;
+        }
+
+        .size-card.selected .size-price {
+            color: #fff;
+        }
+
+        .country-item, .city-item, .shop-item {
+            background: rgba(20, 0, 40, 0.8);
+            border: 1px solid rgba(180, 77, 255, 0.3);
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .country-item:hover, .city-item:hover, .shop-item:hover {
+            border-color: #b44dff;
+            box-shadow: 0 0 15px rgba(180, 77, 255, 0.3);
+            background: rgba(180, 77, 255, 0.1);
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(20, 0, 40, 0.9);
+            border: 1px solid #b44dff;
+            color: #b44dff;
+            padding: 10px 20px;
+            cursor: pointer;
+            z-index: 1001;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+            border-radius: 5px;
+        }
+
+        .back-btn:hover {
+            box-shadow: 0 0 15px rgba(180, 77, 255, 0.4);
+        }
+
+        .graffiti-tag {
+            position: absolute;
+            font-family: 'Arial Black', sans-serif;
+            font-size: 14px;
+            opacity: 0.3;
+            pointer-events: none;
+            transform: rotate(-15deg);
+            color: #c800ff;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .pt-60 {
+            padding-top: 60px;
+        }
+
+        .mb-10 {
+            margin-bottom: 10px;
+        }
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+        .mb-30 {
+            margin-bottom: 30px;
+        }
+        .mt-20 {
+            margin-top: 20px;
+        }
+        .mt-30 {
+            margin-top: 30px;
+        }
+        .mt-40 {
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="graffiti-overlay"></div>
+    <div class="scanlines"></div>
+    
+    <button class="back-btn" onclick="goBack()" style="display: none;" id="backBtn">◄ НАЗАД</button>
+
+    <!-- ========== ГЛАВНАЯ ========== -->
+    <div class="page active" id="homePage">
+        <div class="text-center pt-60" style="position: relative;">
+            <div class="graffiti-tag" style="top: 10px; left: 20px;">WILD</div>
+            <div class="graffiti-tag" style="top: 30px; right: 30px; transform: rotate(10deg);">STREET</div>
+            
+            <div class="neon-text" style="font-size: 48px; margin-bottom: 10px;">NEON</div>
+            <div class="neon-pink" style="font-size: 36px; font-weight: bold; text-shadow: 0 0 20px #ff6b9d, 0 0 40px #c800ff;">MARKETPLACE</div>
+            
+            <div style="margin: 40px 0; font-size: 18px; color: #7b6bff; letter-spacing: 3px;">МАГАЗИН БУДУЩЕГО</div>
+            
+            <div class="cyber-card mb-30">
+                <p style="color: #ddd; line-height: 1.6;">Добро пожаловать в магазин будущего.</p>
+                <div class="graffiti-tag" style="bottom: 5px; right: 10px;">GRAF</div>
+            </div>
+            
+            <button class="cyber-btn" onclick="showPage('countryPage')">▶ НАЧАТЬ ПОКУПКИ</button>
+            
+            <div style="margin-top: 40px; font-size: 12px; color: rgba(180, 77, 255, 0.5);">v.2025.1 | NEON CORP ©</div>
+        </div>
+    </div>
+
+    <!-- ========== СТРАНЫ (ШАГ 1) ========== -->
+    <div class="page" id="countryPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-30">ВЫБЕРИТЕ СТРАНУ</div>
+            
+            <div class="country-item" onclick="selectCountry('RU')">
+                <div style="font-size: 20px; color: #b44dff;">🇷🇺 РОССИЯ</div>
+                <div style="color: #999; font-size: 14px;">Москва, СПб, Казань, Екб</div>
+            </div>
+            
+            <div class="country-item" onclick="selectCountry('KZ')">
+                <div style="font-size: 20px; color: #b44dff;">🇰🇿 КАЗАХСТАН</div>
+                <div style="color: #999; font-size: 14px;">Алматы, Астана</div>
+            </div>
+            
+            <div class="country-item" onclick="selectCountry('BY')">
+                <div style="font-size: 20px; color: #b44dff;">🇧🇾 БЕЛАРУСЬ</div>
+                <div style="color: #999; font-size: 14px;">Минск, Гомель</div>
+            </div>
+            
+            <div class="country-item" onclick="selectCountry('TR')">
+                <div style="font-size: 20px; color: #b44dff;">🇹🇷 ТУРЦИЯ</div>
+                <div style="color: #999; font-size: 14px;">Стамбул, Анкара</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== ГОРОДА (ШАГ 2) ========== -->
+    <div class="page" id="cityPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-10">ВЫБЕРИТЕ ГОРОД</div>
+            <div style="color: #7b6bff; margin-bottom: 20px;" id="selectedCountryLabel"></div>
+            <div id="citiesContainer"></div>
+        </div>
+    </div>
+
+    <!-- ========== КАТАЛОГ (ШАГ 3) ========== -->
+    <div class="page" id="catalogPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-10">КАТАЛОГ</div>
+            <div style="color: #7b6bff; margin-bottom: 20px;" id="catalogLocationLabel"></div>
+            <div class="products-grid" id="productsContainer"></div>
+        </div>
+    </div>
+
+    <!-- ========== РАЗМЕРЫ (ШАГ 4) ========== -->
+    <div class="page" id="sizePage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-10" id="selectedProductTitle">ВЫБОР РАЗМЕРА</div>
+            <div style="color: #ff6b9d; font-size: 14px; margin-bottom: 20px;">Цена зависит от размера</div>
+            <div class="sizes-grid" id="sizesContainer"></div>
+            <button class="cyber-btn mt-30" id="confirmSizeBtn" disabled onclick="goToShops()">ВЫБРАТЬ РАЗМЕР</button>
+        </div>
+    </div>
+
+    <!-- ========== ТОЧКИ ВЫДАЧИ (ШАГ 5) ========== -->
+    <div class="page" id="shopPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-10">ТОЧКИ ВЫДАЧИ</div>
+            <div style="color: #7b6bff; margin-bottom: 20px;" id="selectedCityName"></div>
+            
+            <div class="cyber-card mb-20" id="orderSummary">
+                <div style="color: #ddd; font-size: 14px; line-height: 1.8;">
+                    <div>Товар: <span style="color: #b44dff;" id="shopProductName"></span></div>
+                    <div>Размер: <span style="color: #7b6bff;" id="shopSize"></span></div>
+                    <div>Цена: <span style="color: #ff6b9d;" id="shopPrice"></span></div>
+                </div>
+            </div>
+            
+            <div id="shopsContainer"></div>
+        </div>
+    </div>
+
+    <!-- ========== ОПЛАТА (ШАГ 6) ========== -->
+    <div class="page" id="paymentPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-30">СПОСОБ ОПЛАТЫ</div>
+            
+            <div class="cyber-card mb-20">
+                <div style="color: #ddd; line-height: 2;">
+                    <div>Товар: <span style="color:#b44dff" id="paymentProduct"></span></div>
+                    <div>Размер: <span style="color:#7b6bff" id="paymentSize"></span></div>
+                    <div>Выдача: <span style="color:#7b6bff" id="paymentShop"></span></div>
+                    <div>Сумма: <span style="color:#ff6b9d; font-size: 24px;" id="paymentPrice"></span></div>
+                </div>
+            </div>
+            
+            <div class="cyber-card mb-15" onclick="selectPayment('crypto')">
+                <div style="font-size: 20px; color: #b44dff;">💎 КРИПТОВАЛЮТА</div>
+                <div style="color: #999; font-size: 14px;">TON, USDT</div>
+            </div>
+            
+            <div class="cyber-card" onclick="selectPayment('bank')">
+                <div style="font-size: 20px; color: #b44dff;">🏦 БАНКОВСКИЙ ПЕРЕВОД</div>
+                <div style="color: #999; font-size: 14px;">По реквизитам</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== КРИПТО-ОПЛАТА ========== -->
+    <div class="page" id="cryptoPaymentPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-30">КРИПТО-ОПЛАТА</div>
+            
+            <div class="cyber-card mb-20">
+                <div style="color: #b44dff; margin-bottom: 15px;">СУММА К ОПЛАТЕ:</div>
+                <div style="color: #ff6b9d; font-size: 32px;" id="cryptoAmount"></div>
+            </div>
+            
+            <div class="cyber-card mb-15" onclick="selectCrypto('TON')">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7b6bff; font-size: 18px;">💎 TON</span>
+                    <span style="color: #b44dff;" id="tonAmount"></span>
+                </div>
+            </div>
+            
+            <div class="cyber-card mb-15" onclick="selectCrypto('USDT')">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7b6bff; font-size: 18px;">💵 USDT</span>
+                    <span style="color: #b44dff;" id="usdtAmount"></span>
+                </div>
+            </div>
+            
+            <button class="cyber-btn pink-btn mt-20" onclick="processPayment()">ОПЛАТИТЬ</button>
+        </div>
+    </div>
+
+    <!-- ========== БАНКОВСКАЯ ОПЛАТА ========== -->
+    <div class="page" id="bankPaymentPage">
+        <div class="text-center pt-60">
+            <div class="neon-text mb-30">РЕКВИЗИТЫ</div>
+            
+            <div class="cyber-card mb-20" id="bankDetailsContainer">
+                <div style="color: #ddd; line-height: 2;">
+                    <div>🏦 Банк: <span style="color: #b44dff;" id="bankName">SBERBANK</span></div>
+                    <div>👤 Получатель: <span style="color: #7b6bff;" id="bankRecipient">NEON WEAR LLC</span></div>
+                    <div>📋 ИНН: <span style="color: #999;" id="bankInn">7727XXXXXX</span></div>
+                    <div>💳 Счет: <span style="color: #999;" id="bankAccount">4080XXXXXXXXXXXXXX</span></div>
+                    <div>🏷 БИК: <span style="color: #999;" id="bankBik">0445XXXXXX</span></div>
+                    <div style="margin-top: 10px; color: #ff6b9d;">Сумма: <span id="bankAmount"></span></div>
+                </div>
+            </div>
+            
+            <button class="cyber-btn" onclick="copyBankDetails()">📋 КОПИРОВАТЬ РЕКВИЗИТЫ</button>
+        </div>
+    </div>
+
+    <!-- ========== УСПЕХ ========== -->
+    <div class="page" id="successPage">
+        <div class="text-center pt-60">
+            <div style="font-size: 72px; margin-bottom: 20px; filter: drop-shadow(0 0 20px #b44dff);">✅</div>
+            <div class="neon-text mb-30">ЗАКАЗ ОФОРМЛЕН!</div>
+            <div class="cyber-card mb-20">
+                <div style="color: #ddd; line-height: 1.8;">
+                    <div>Номер заказа: <span style="color: #b44dff;" id="orderNumber">#NEON-2025-0001</span></div>
+                    <div style="color: #7b6bff;">Ожидайте звонка оператора</div>
+                </div>
+            </div>
+            <button class="cyber-btn" onclick="window.Telegram.WebApp.close()">ЗАКРЫТЬ</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        
+        // ========== ДАННЫЕ ==========
+        const storeData = {
+            countries: {
+                'RU': {
+                    name: 'РОССИЯ',
+                    cities: {
+                        'moscow': { name: 'МОСКВА', shops: [
+                            { id: 'msk1', name: 'Москва Центр', address: 'ул. Тверская, 15', phone: '+7(999)123-45-67' },
+                            { id: 'msk2', name: 'Москва Юг', address: 'ул. Варшавская, 42', phone: '+7(999)234-56-78' }
+                        ]},
+                        'spb': { name: 'САНКТ-ПЕТЕРБУРГ', shops: [
+                            { id: 'spb1', name: 'СПб Центр', address: 'Невский пр., 100', phone: '+7(999)456-78-90' }
+                        ]}
+                    }
+                },
+                'KZ': {
+                    name: 'КАЗАХСТАН',
+                    cities: {
+                        'almaty': { name: 'АЛМАТЫ', shops: [
+                            { id: 'alm1', name: 'Алматы Центр', address: 'пр. Назарбаева, 50', phone: '+7(701)123-45-67' }
+                        ]},
+                        'astana': { name: 'АСТАНА', shops: [
+                            { id: 'ast1', name: 'Астана Центр', address: 'ул. Туран, 25', phone: '+7(701)765-43-21' }
+                        ]}
+                    }
+                },
+                'BY': {
+                    name: 'БЕЛАРУСЬ',
+                    cities: {
+                        'minsk': { name: 'МИНСК', shops: [
+                            { id: 'mnk1', name: 'Минск Центр', address: 'пр. Независимости, 50', phone: '+375(29)123-45-67' }
+                        ]}
+                    }
+                },
+                'TR': {
+                    name: 'ТУРЦИЯ',
+                    cities: {
+                        'istanbul': { name: 'СТАМБУЛ', shops: [
+                            { id: 'ist1', name: 'Стамбул Центр', address: 'Istiklal Cd., 100', phone: '+90(555)123-45-67' }
+                        ]}
+                    }
+                }
+            },
+            products: [
+                {
+                    id: 'hoodie',
+                    name: 'CYBER HOODIE',
+                    image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%231a0030"/><text x="100" y="100" font-size="60" text-anchor="middle" fill="%23b44dff">🧥</text></svg>',
+                    sizes: { 'XS': 8500, 'S': 10500, 'M': 12500, 'L': 14500, 'XL': 16500 }
+                },
+                {
+                    id: 'tshirt',
+                    name: 'GLITCH T-SHIRT',
+                    image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%231a0030"/><text x="100" y="100" font-size="60" text-anchor="middle" fill="%237b6bff">👕</text></svg>',
+                    sizes: { 'S': 3500, 'M': 4500, 'L': 5500, 'XL': 6500 }
+                }
+            ]
+        };
+        
+        const state = {
+            history: ['homePage'],
+            selectedCountry: null,
+            selectedCity: null,
+            selectedProduct: null,
+            selectedSize: null,
+            selectedPrice: null,
+            selectedShop: null,
+            selectedPayment: null
+        };
+        
+        // ========== НАВИГАЦИЯ ==========
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            state.history.push(pageId);
+            document.getElementById('backBtn').style.display = pageId === 'homePage' ? 'none' : 'block';
+            window.scrollTo(0, 0);
+        }
+        
+        function goBack() {
+            if (state.history.length > 1) {
+                state.history.pop();
+                const prev = state.history[state.history.length - 1];
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(prev).classList.add('active');
+                if (prev === 'homePage') document.getElementById('backBtn').style.display = 'none';
+                window.scrollTo(0, 0);
+            }
+        }
+        
+        // ========== ШАГ 1: ВЫБОР СТРАНЫ ==========
+        function selectCountry(code) {
+            state.selectedCountry = code;
+            const country = storeData.countries[code];
+            
+            document.getElementById('selectedCountryLabel').textContent = country.name;
+            
+            const container = document.getElementById('citiesContainer');
+            container.innerHTML = '';
+            
+            Object.entries(country.cities).forEach(([cityCode, city]) => {
+                const div = document.createElement('div');
+                div.className = 'city-item';
+                div.onclick = () => selectCity(cityCode);
+                div.innerHTML = `<div style="font-size: 20px; color: #b44dff;">🏙 ${city.name}</div><div style="color: #999; font-size: 14px;">${city.shops.length} точки выдачи</div>`;
+                container.appendChild(div);
+            });
+            
+            showPage('cityPage');
+        }
+        
+        // ========== ШАГ 2: ВЫБОР ГОРОДА ==========
+        function selectCity(cityCode) {
+            state.selectedCity = cityCode;
+            const country = storeData.countries[state.selectedCountry];
+            const city = country.cities[cityCode];
+            
+            document.getElementById('catalogLocationLabel').textContent = `${country.name} → ${city.name}`;
+            
+            const container = document.getElementById('productsContainer');
+            container.innerHTML = '';
+            
+            storeData.products.forEach(product => {
+                const div = document.createElement('div');
+                div.className = 'product-card';
+                div.onclick = () => selectProduct(product.id);
+                div.innerHTML = `
+                    <div class="product-image"><img src="${product.image}" alt="${product.name}"></div>
+                    <div class="product-info"><div class="product-name">${product.name}</div></div>
+                `;
+                container.appendChild(div);
+            });
+            
+            showPage('catalogPage');
+        }
+        
+        // ========== ШАГ 3: ВЫБОР ТОВАРА ==========
+        function selectProduct(productId) {
+            state.selectedProduct = productId;
+            const product = storeData.products.find(p => p.id === productId);
+            
+            document.getElementById('selectedProductTitle').textContent = product.name;
+            
+            const container = document.getElementById('sizesContainer');
+            container.innerHTML = '';
+            
+            Object.entries(product.sizes).forEach(([size, price]) => {
+                const div = document.createElement('div');
+                div.className = 'size-card';
+                div.onclick = function() { selectSize(size, price, this); };
+                div.innerHTML = `<div class="size-label">${size}</div><div class="size-price">${price.toLocaleString()} ₽</div>`;
+                container.appendChild(div);
+            });
+            
+            state.selectedSize = null;
+            state.selectedPrice = null;
+            const btn = document.getElementById('confirmSizeBtn');
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.textContent = 'ВЫБРАТЬ РАЗМЕР';
+            
+            showPage('sizePage');
+        }
+        
+        // ========== ШАГ 4: ВЫБОР РАЗМЕРА ==========
+        function selectSize(size, price, element) {
+            state.selectedSize = size;
+            state.selectedPrice = price;
+            
+            document.querySelectorAll('.size-card').forEach(c => c.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            const btn = document.getElementById('confirmSizeBtn');
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.textContent = `ДАЛЕЕ ▶ ${price.toLocaleString()} ₽`;
+        }
+        
+        function goToShops() {
+            if (!state.selectedSize) return;
+            
+            const product = storeData.products.find(p => p.id === state.selectedProduct);
+            const country = storeData.countries[state.selectedCountry];
+            const city = country.cities[state.selectedCity];
+            
+            document.getElementById('selectedCityName').textContent = `${country.name} → ${city.name}`;
+            document.getElementById('shopProductName').textContent = product.name;
+            document.getElementById('shopSize').textContent = state.selectedSize;
+            document.getElementById('shopPrice').textContent = state.selectedPrice.toLocaleString() + ' ₽';
+            
+            const container = document.getElementById('shopsContainer');
+            container.innerHTML = '';
+            
+            city.shops.forEach(shop => {
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                div.onclick = () => selectShop(shop);
+                div.innerHTML = `
+                    <div style="color: #b44dff; font-size: 18px;">📍 ${shop.name}</div>
+                    <div style="color: #999; font-size: 14px;">${shop.address}</div>
+                    <div style="color: #7b6bff; font-size: 12px;">📞 ${shop.phone}</div>
+                `;
+                container.appendChild(div);
+            });
+            
+            showPage('shopPage');
+        }
+        
+        // ========== ШАГ 5: ВЫБОР ТОЧКИ ВЫДАЧИ ==========
+        function selectShop(shop) {
+            state.selectedShop = shop;
+            
+            const product = storeData.products.find(p => p.id === state.selectedProduct);
+            
+            document.getElementById('paymentProduct').textContent = product.name;
+            document.getElementById('paymentSize').textContent = state.selectedSize;
+            document.getElementById('paymentShop').textContent = shop.name;
+            document.getElementById('paymentPrice').textContent = state.selectedPrice.toLocaleString() + ' ₽';
+            document.getElementById('cryptoAmount').textContent = state.selectedPrice.toLocaleString() + ' ₽';
+            document.getElementById('tonAmount').textContent = `≈ ${(state.selectedPrice / 150).toFixed(1)} TON`;
+            document.getElementById('usdtAmount').textContent = `≈ ${(state.selectedPrice / 100).toFixed(0)} USDT`;
+            document.getElementById('bankAmount').textContent = state.selectedPrice.toLocaleString() + ' ₽';
+            
+            showPage('paymentPage');
+        }
+        
+        // ========== ШАГ 6: ОПЛАТА ==========
+        function selectPayment(method) {
+            state.selectedPayment = method;
+            showPage(method === 'crypto' ? 'cryptoPaymentPage' : 'bankPaymentPage');
+        }
+        
+        function selectCrypto(currency) {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            alert(`Выбрана оплата в ${currency}\nСумма: ${state.selectedPrice.toLocaleString()} ₽\n\nИнтеграция с платежной системой...`);
+        }
+        
+        function processPayment() {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            document.getElementById('orderNumber').textContent = '#NEON-' + Date.now().toString().slice(-6);
+            setTimeout(() => showPage('successPage'), 1000);
+        }
+        
+        function copyBankDetails() {
+            const text = `Банк: SBERBANK\nПолучатель: NEON WEAR LLC\nИНН: 7727XXXXXX\nСчет: 4080XXXXXXXXXXXXXX\nБИК: 0445XXXXXX\nСумма: ${state.selectedPrice.toLocaleString()} ₽`;
+            navigator.clipboard.writeText(text).then(() => {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                alert('Реквизиты скопированы!');
+            });
+        }
+        
+        // ========== ИНИЦИАЛИЗАЦИЯ ==========
+        document.addEventListener('DOMContentLoaded', () => showPage('homePage'));
+        tg.BackButton.onClick(() => goBack());
+    </script>
+</body>
+</html>
