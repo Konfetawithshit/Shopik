@@ -232,7 +232,6 @@ async def set_webhook():
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             print(await resp.text())
-
 # ========== ЗАПУСК ==========
 app = web.Application()
 app.router.add_post("/webhook", webhook)
@@ -248,6 +247,10 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
     print(f"✅ Бот на порту {PORT}")
+    
+    # Вечный цикл чтобы Render не убил процесс
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     asyncio.run(main())
